@@ -30,7 +30,6 @@ from PIL import ImageDraw, ImageFont
 
 from config import token
 
-
 # общие параметры
 device_id = 0
 if torch.cuda.is_available() == True:
@@ -111,7 +110,6 @@ bot = telebot.TeleBot(token)
 def get_prediction(img, threshold):
 
     # Загрузка и преобразоваие изображения в тензор
-    
     transforms_img=torchvision.transforms.ToTensor()
     img_transformed = transforms_img(img).to(device)
     
@@ -147,8 +145,7 @@ def get_prediction(img, threshold):
     for i in range(len(pred_boxes)):
         sign = img.crop(pred_boxes[i])
         sign = transforms_sign(sign).to(device)
-        pred_label = int(classifier(sign.unsqueeze(0)).data.max(1,keepdim=True)[1][0][0])      # можно подумать как вытащить уверенность модели  
-        #np.argmax(classifier(sign.unsqueeze(0)).data)      альтернатива
+        pred_label = int(classifier(sign.unsqueeze(0)).data.max(1,keepdim=True)[1][0][0])
         pred_label = label_map.get(pred_label)
         pred_labels.append(pred_label)
     return pred_boxes, pred_labels, pred_scores
@@ -180,7 +177,6 @@ def get_text_message(message):
     
     elif message.photo:
         image = message.photo
-        #bot.send_message(message.from_user.id, 'Получено фото')
         file_path = '.'
         raw = message.photo[3].file_id
         name = raw + '.jpg'
@@ -195,7 +191,6 @@ def get_text_message(message):
                 
         new_image = img_test.copy()
         font = ImageFont.load_default()
-        #font = ImageFont.truetype('arial.ttf', size=18)
         pencil = ImageDraw.Draw(new_image)
         for i in range(len((result[0]))):
             pencil.rectangle(result[0][i], fill = None, width=2, outline='yellow')
