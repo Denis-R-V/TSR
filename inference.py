@@ -2,17 +2,14 @@
 # Инференс (Telegram Bot)
 
 # Запуск в colab или локально
-colab = False
-
-if colab == True:
+# если работаем в колабе - монтируем диск
+try:
     from google.colab import drive
     drive.mount('/content/drive')
-if colab == True:
-    dataset_path = '.'
-    checkpoints_path = '../content/drive/MyDrive/TSR/checkpoints'
-else:
-    dataset_path = 'data'
-    checkpoints_path = 'checkpoints'
+    
+    colab=True
+except:
+    colab=False
 
 import json
 import os
@@ -30,7 +27,11 @@ from PIL import ImageDraw, ImageFont
 
 from config import token
 
-# общие параметры
+# Пути и общие параметры
+dataset_path = 'data/raw/RTSD' if colab else os.path.join('data', 'raw', 'RTSD')
+data_prepared_path = '../content/drive/MyDrive/TSR/data/prepared' if colab else os.path.join('data', 'prepared')
+models_path = '../content/drive/MyDrive/TSR/models' if colab else 'models'
+
 device_id = 0
 if torch.cuda.is_available() == True:
     device = f'cuda:{device_id}'
@@ -73,7 +74,7 @@ def load_model_detection(detector_name, num_classes, epoch):
         detector.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
         # Загрузка весов модели
-        checkpoint = torch.load(os.path.join(checkpoints_path, f'chkpt_detector_{detector_name}_{epoch}.pth'), map_location=device)
+        checkpoint = torch.load(os.path.join(models_path, f'chkpt_detector_{detector_name}_{epoch}.pth'), map_location=device)
         detector.load_state_dict(checkpoint['model_state_dict'])
         print(f"Для детектора {detector_name} загружены веса эпохи {epoch}")
     
@@ -91,7 +92,7 @@ def load_model_classifier(classifier_name, num_classes, epoch):
         print(f"Загружен классификатор {classifier_name}")
 
         # Загрузка весов модели
-        checkpoint = torch.load(os.path.join(checkpoints_path, f'classifier_{classifier_name}_chkpt_{epoch}.pth'), map_location=device)
+        checkpoint = torch.load(os.path.join(models_path, f'classifier_{classifier_name}_chkpt_{epoch}.pth'), map_location=device)
         classifier.load_state_dict(checkpoint['model_state_dict'])
         classifier.eval()
         print(f"Для классификатора {classifier_name} загружены веса эпохи {epoch}")
@@ -136,7 +137,7 @@ def get_prediction(img, threshold):
     transforms_sign = torchvision.transforms.Compose([torchvision.transforms.Resize((224,224)),
                                                       torchvision.transforms.ToTensor()
                                                       ]) 
-    with open(os.path.join(dataset_path, 'RTSD', 'label_map.json'), 'r') as read_file:
+    with open(os.path.join(dataset_path, 'label_map.json'), 'r') as read_file:
         label_map = json.load(read_file)
     read_file.close()
     label_map = {v:k for k, v in label_map.items()}
@@ -199,7 +200,7 @@ def get_text_message(message):
             mark = str(result[1][i]) + ': ' + str(round(result[2][i], 2))
             pencil.text((text_x, text_y - 9), mark, font=font, fill = 'red', size = 20)
         
-        with open(os.path.join(dataset_path, 'labels_names_map.json'), 'r') as read_file:
+        with open(os.path.join(data_prepared_path, 'labels_names_map.json'), 'r') as read_file:
             labels_names_map = json.load(read_file)
         read_file.close()
 
