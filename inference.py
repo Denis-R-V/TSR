@@ -1,31 +1,27 @@
 # Система распознавания дорожных знаков на датасете RTSD
 # Инференс (Telegram Bot)
 
+import json
+import os
+import re
+
+import telebot
+import torch
+import torch.nn as nn
+import torchvision
+from PIL import Image, ImageDraw, ImageFont
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+from config import token
+
 # Запуск в colab или локально
 # если работаем в колабе - монтируем диск
 try:
     from google.colab import drive
     drive.mount('/content/drive')
     
-    colab=True
 except:
     colab=False
-
-import json
-import os
-import re
-
-import torch
-import torch.nn as nn
-import torchvision
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-
-import telebot
-
-from PIL import Image
-from PIL import ImageDraw, ImageFont
-
-from config import token
 
 # Пути и общие параметры
 dataset_path = 'data/raw/RTSD' if colab else os.path.join('data', 'raw', 'RTSD')
