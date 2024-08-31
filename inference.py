@@ -170,7 +170,7 @@ def get_text_message(message):
             bot.send_message(message.from_user.id, f'Установлен debug_mode = {debug_mode}')
         
         else:
-            bot.send_message(message.from_user.id, 'Привет! Бот принимает фотографию с дорожными знаками и возвращает фотографию с отмеченными дорожными знаками и их названиями.')
+            bot.send_message(message.from_user.id, 'Привет! Бот принимает фотографию и возвращает фотографию с отмеченными дорожными знаками и их названиями.')
     
     elif message.photo:
         image = message.photo
