@@ -14,7 +14,7 @@ class Builder:
     def __init__(self,
                  device:str = 'cpu',
                  detector_path: str = os.path.join('..', 'models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
-                 classifier_path: str = os.path.join('..', 'models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_chkpt_29.pth'),
+                 classifier_path: str = os.path.join('..', 'models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_model_29.pth'),
                  detector_num_classes: int = 2,
                  classifier_num_classes: int = 156,
                  detector_threshold: float = 0.,
@@ -136,9 +136,7 @@ class Builder:
     def predict_signs(self, detector_input):
         """Детекция знаков на изображении"""
         
-        transforms_img=torchvision.transforms.ToTensor()
-        detector_input = transforms_img(detector_input).to(self.device)
-        
+        detector_input = v2.functional.to_tensor(detector_input).to(self.device)
         with torch.no_grad():
             detector_pred = self.detector([detector_input])
 
