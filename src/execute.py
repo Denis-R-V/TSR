@@ -1,8 +1,20 @@
+import os
+
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+import torchvision
+from PIL import Image
+from PIL.JpegImagePlugin import JpegImageFile
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.transforms import v2
+
 class Builder:
     def __init__(self,
                  device:str = 'cpu',
-                 detector_path: str = os.path.join(models_path, 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
-                 classifier_path: str = os.path.join(models_path, 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_chkpt_29.pth'),
+                 detector_path: str = os.path.join('..', 'models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
+                 classifier_path: str = os.path.join('..', 'models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_chkpt_29.pth'),
                  detector_num_classes: int = 2,
                  classifier_num_classes: int = 156,
                  detector_threshold: float = 0.,
@@ -19,9 +31,6 @@ class Builder:
         self.detector_threshold = detector_threshold
         self.classifier_threshold = classifier_threshold
         self.debug_mode = debug_mode
-
-        #self.transforms_sign = v2.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Resize((224,224))]) 
-        #self.softmax = torch.nn.Softmax(dim=1)
         
     def __load_detector(self, path, num_classes):
         """Загрузка детектора"""
@@ -112,7 +121,7 @@ class Builder:
 
                 print(f"Для {classifier_name} загружены веса {path}")
 
-    def preprocessing_single(self, payload: str | np.ndarray | PIL.JpegImagePlugin.JpegImageFile):
+    def preprocessing_single(self, payload: str | np.ndarray | JpegImageFile):
         """Препроцессинг для онлайн процесса"""
         
         if isinstance(payload, str) == True:
@@ -131,16 +140,16 @@ class Builder:
         detector_input = transforms_img(detector_input).to(self.device)
         
         with torch.no_grad():
-            detector_pred = detector([detector_input])
+            detector_pred = self.detector([detector_input])
 
         pred_boxes = [[i[0], i[1], i[2], i[3]] for i in list(detector_pred[0]['boxes'].detach().cpu().numpy())]
         pred_detector_labels = list(detector_pred[0].get('labels').detach().cpu().numpy())
         pred_detector_scores = list(detector_pred[0].get('scores').detach().cpu().numpy())
 
         # Фильтрация предсказаний с уверенностью модели больше threshold
-        if (debug_mode == False) and (self.detector_threshold > 0.):       
+        if (self.debug_mode == False) and (self.detector_threshold > 0.):       
             try:
-                pred_tr = [pred_detector_scores.index(x) for x in pred_detector_scores if x > threshold][-1]
+                pred_tr = [pred_detector_scores.index(x) for x in pred_detector_scores if x > self.detector_threshold][-1]
                 pred_boxes = pred_boxes[:pred_tr+1]
                 pred_detector_labels = pred_detector_labels[:pred_tr+1] 
                 pred_detector_scores = pred_detector_scores[:pred_tr+1]
@@ -153,24 +162,22 @@ class Builder:
 
     def predict_class(self, img):
         """Классификация знака"""
-        #softmax = torch.nn.Softmax(dim=1) # Софтмакс для получения вероятности предсказанного класса    # возможно вынести в init
 
         with torch.no_grad():
-            pred_classifier = classifier(img.unsqueeze(0))
-            #pred_classifier = self.softmax(pred_classifier).cpu().max(1,keepdim=True)
+            pred_classifier = self.classifier(img.unsqueeze(0))
             pred_classifier = torch.nn.functional.softmax(pred_classifier, dim=1).cpu().max(1,keepdim=True)
 
-        if (debug_mode == False) and (float(pred_classifier.values[0][0]) < self.classifier_threshold):
+        if (self.debug_mode == False) and (float(pred_classifier.values[0][0]) < self.classifier_threshold):
             pred_classifier.indices[0][0] = 0
 
         return pred_classifier
 
-    def predict_single(self, model_input: str | np.ndarray | PIL.JpegImagePlugin.JpegImageFile):
+    def predict_single(self, model_input: str | np.ndarray | JpegImageFile):
         """Скоринг для онлайн процесса"""
         '''
-        на вход подается путь к изображению или изображение и порог чувствительности детектора
-        функция предсказания возвращает координаты рамок, ID классов, уверенности детекций и вероятности класса для одного изображения
-        при debug_mode=True выводятся детекции с любой уверенностью и 0-й класс (фон) тоже выводится
+        на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
+        функция возвращает координаты рамок, ID классов, уверенности детекций и вероятности класса для одного изображения
+        при debug_mode=True выводятся детекции с любой уверенностью и 0-й класс (фон)
         ''' 
 
         img = self.preprocessing_single(model_input)
@@ -184,7 +191,6 @@ class Builder:
             else:
                 sign = img.crop(pred_boxes[i])
             
-            #sign = self.transforms_sign(sign).to(self.device)
             sign = v2.functional.to_tensor(sign)
             sign = v2.functional.resize(sign, [224,224]).to(self.device)       
             pred_classifier = self.predict_class(sign)
@@ -193,7 +199,7 @@ class Builder:
             pred_classifier_scores.append(float(pred_classifier.values[0][0]))
 
         # Если режим отладки не включен убираем детекции, которые классифицированы как фон
-        if debug_mode == False:
+        if self.debug_mode == False:
             # индексы 0 класса (фона) в предсказаниях классификатора
             background_indexes = [index for index, label in enumerate(pred_labels) if label ==0]
             if background_indexes != []:
