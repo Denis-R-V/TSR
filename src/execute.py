@@ -1,3 +1,4 @@
+import json
 import os
 
 import cv2
@@ -12,7 +13,9 @@ from torchvision.transforms import v2
 
 class Builder:
     def __init__(self,
-                 device:str = 'cpu',
+                 device: str = 'cpu',
+                 class2label_path: str = os.path.join('..', 'data', 'raw', 'RTSD', 'label_map.json'),     # скопировать в prepared
+                 label2name_path: str = os.path.join('..', 'data', 'prepared', 'labels_names_map.json'),
                  detector_path: str = os.path.join('..', 'models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
                  classifier_path: str = os.path.join('..', 'models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_model_29.pth'),
                  detector_num_classes: int = 2,
@@ -25,13 +28,32 @@ class Builder:
         print('Добавить файлы со знаками')
         
         self.device = device
-        self.__load_detector(detector_path, detector_num_classes)
-        self.__load_classisier(classifier_path, classifier_num_classes)
-    
         self.detector_threshold = detector_threshold
         self.classifier_threshold = classifier_threshold
         self.debug_mode = debug_mode
-        
+
+        self.__load_class2label_map(class2label_path)
+        self.__load_label2name_map(label2name_path)
+        self.__load_detector(detector_path, detector_num_classes)
+        self.__load_classisier(classifier_path, classifier_num_classes)
+
+    def __load_class2label_map(self, path):
+        """Загрузка маппинга ID классов на ID знаков"""
+ 
+        with open(path, 'r') as read_file:
+            self.class2label_map = json.load(read_file)
+
+        self.class2label_map = {v:k for k, v in self.class2label_map.items()}
+        self.class2label_map = {0: 'bg', **self.class2label_map}
+
+    def __load_label2name_map(self, path):
+        """Загрузка маппинга ID знаков на их название"""
+      
+        with open(path, 'r') as read_file:
+            self.labels2names_map = json.load(read_file)
+        read_file.close()
+        self.labels2names_map = {'bg': 'Background (ложная детекция)', **self.labels2names_map}
+    
     def __load_detector(self, path, num_classes):
         """Загрузка детектора"""
 
@@ -140,7 +162,7 @@ class Builder:
         with torch.no_grad():
             detector_pred = self.detector([detector_input])
 
-        pred_boxes = [[i[0], i[1], i[2], i[3]] for i in list(detector_pred[0]['boxes'].detach().cpu().numpy())]
+        bboxes = [[i[0], i[1], i[2], i[3]] for i in list(detector_pred[0]['boxes'].detach().cpu().numpy())]
         pred_detector_labels = list(detector_pred[0].get('labels').detach().cpu().numpy())
         pred_detector_scores = list(detector_pred[0].get('scores').detach().cpu().numpy())
 
@@ -148,15 +170,15 @@ class Builder:
         if (self.debug_mode == False) and (self.detector_threshold > 0.):       
             try:
                 pred_tr = [pred_detector_scores.index(x) for x in pred_detector_scores if x > self.detector_threshold][-1]
-                pred_boxes = pred_boxes[:pred_tr+1]
+                bboxes = bboxes[:pred_tr+1]
                 pred_detector_labels = pred_detector_labels[:pred_tr+1] 
                 pred_detector_scores = pred_detector_scores[:pred_tr+1]
             except:
-                pred_boxes = []
+                bboxes = []
                 pred_detector_labels = []
                 pred_detector_scores = []
 
-        return pred_boxes, pred_detector_labels, pred_detector_scores
+        return bboxes, pred_detector_labels, pred_detector_scores
 
     def predict_class(self, img):
         """Классификация знака"""
@@ -179,15 +201,15 @@ class Builder:
         ''' 
 
         img = self.preprocessing_single(model_input)
-        pred_boxes, pred_labels, pred_detector_scores = self.predict_signs(img)
+        bboxes, pred_labels, pred_detector_scores = self.predict_signs(img)
 
         pred_labels = []
         pred_classifier_scores = []
-        for i in range(len(pred_boxes)):
+        for i in range(len(bboxes)):
             if img.__class__.__name__ == 'ndarray':
-                sign = img[round(pred_boxes[i][1]):round(pred_boxes[i][3]), round(pred_boxes[i][0]):round(pred_boxes[i][2])]
+                sign = img[round(bboxes[i][1]):round(bboxes[i][3]), round(bboxes[i][0]):round(bboxes[i][2])]
             else:
-                sign = img.crop(pred_boxes[i])
+                sign = img.crop(bboxes[i])
             
             sign = v2.functional.to_tensor(sign)
             sign = v2.functional.resize(sign, [224,224]).to(self.device)       
@@ -204,9 +226,9 @@ class Builder:
                 background_indexes.reverse()
                 # удаляем предикты для всех результатов для 0 класса (фона)
                 for index in background_indexes:
-                    pred_boxes.pop(index)
+                    bboxes.pop(index)
                     pred_labels.pop(index)
                     pred_detector_scores.pop(index)
                     pred_classifier_scores.pop(index)
         
-        return pred_boxes, pred_labels, pred_detector_scores, pred_classifier_scores
+        return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
