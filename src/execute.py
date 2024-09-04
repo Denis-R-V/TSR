@@ -200,6 +200,9 @@ class Builder:
         при debug_mode=True выводятся детекции с любой уверенностью и 0-й класс (фон)
         ''' 
 
+        assert isinstance(model_input, str) or isinstance(model_input, np.ndarray) or isinstance(model_input, JpegImageFile), \
+            'На вход модели подается путь к изображению или изображение, открытое PIL или OpenCV (BGR)'
+
         img = self.preprocessing_single(model_input)
         bboxes, pred_labels, pred_detector_scores = self.predict_signs(img)
 
