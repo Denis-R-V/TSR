@@ -158,7 +158,12 @@ class Builder:
     def predict_signs(self, detector_input):
         """Детекция знаков на изображении"""
         
-        detector_input = v2.functional.to_tensor(detector_input).to(self.device)
+        #detector_input = v2.functional.to_tensor(detector_input).to(self.device)
+        # The function `to_tensor(...)` is deprecated and will be removed in a future release.
+        # Instead, please use `to_image(...)` followed by `to_dtype(..., dtype=torch.float32, scale=True)
+        detector_input = v2.functional.to_image(detector_input)
+        detector_input = v2.functional.to_dtype(detector_input, dtype=torch.float32, scale=True).to(self.device)
+
         with torch.no_grad():
             detector_pred = self.detector([detector_input])
 
@@ -213,8 +218,12 @@ class Builder:
                 sign = img[round(bboxes[i][1]):round(bboxes[i][3]), round(bboxes[i][0]):round(bboxes[i][2])]
             else:
                 sign = img.crop(bboxes[i])
-            
-            sign = v2.functional.to_tensor(sign)
+  
+            #sign = v2.functional.to_tensor(sign)
+            # The function `to_tensor(...)` is deprecated and will be removed in a future release.
+            # Instead, please use `to_image(...)` followed by `to_dtype(..., dtype=torch.float32, scale=True)
+            sign = v2.functional.to_image(sign)
+            sign = v2.functional.to_dtype(sign, dtype=torch.float32, scale=True)
             sign = v2.functional.resize(sign, [224,224]).to(self.device)       
             pred_classifier = self.predict_class(sign)
             
