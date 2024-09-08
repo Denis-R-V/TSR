@@ -15,7 +15,7 @@ from torchvision.transforms import v2
 class Builder:
     def __init__(self,
                  device: str = 'cpu',
-                 class2label_path: str = os.path.join('data', 'prepared', 'label_map.json'),     # скопировать в prepared
+                 class2label_path: str = os.path.join('data', 'prepared', 'label_map.json'),
                  label2name_path: str = os.path.join('data', 'prepared', 'labels_names_map.json'),
                  detector_path: str = os.path.join('models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
                  classifier_path: str = os.path.join('models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_model_29.pth'),
@@ -244,7 +244,7 @@ class Builder:
         
         return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
     
-    def draw_bboxes_pil(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
+    def __draw_bboxes_pil(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
         """Добавление рамок и описаний на изображение, открытое PIL"""
 
         '''
@@ -284,7 +284,7 @@ class Builder:
 
         return img
 
-    def draw_bboxes_opencv(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
+    def __draw_bboxes_opencv(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
         """Добавление рамок и описаний на изображение, открытое OpenCV"""
         # font  FONT_HERSHEY_SIMPLEX FONT_HERSHEY_PLAIN FONT_HERSHEY_DUPLEX FONT_HERSHEY_COMPLEX FONT_HERSHEY_TRIPLEX
         #       FONT_HERSHEY_COMPLEX_SMALL FONT_HERSHEY_SCRIPT_SIMPLEX FONT_HERSHEY_SCRIPT_COMPLEX
@@ -358,10 +358,10 @@ class Builder:
 
         # если изображение открыто PIL
         if isinstance(img, JpegImageFile) == True:
-            img_pred = self.draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+            img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
         # если изображение открыто OpenCV
         else:
-            img_pred = self.draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+            img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
 
         # Возврат threshold или debug_mode
         if detector_threshold is not None: self.detector_threshold = detector_threshold_old
