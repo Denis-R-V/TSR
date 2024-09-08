@@ -10,22 +10,13 @@ import torch
 from config import token
 from src.execute import Builder
 
-# Запуск в colab или локально
-# если работаем в колабе - монтируем диск
-try:
-    from google.colab import drive
-    drive.mount('/content/drive')
-    colab=True
-except:
-    colab=False
-
 # Пути к данным и параметры
 device_id = 0
 device = f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu'
 
-data_prepared_path = '../content/drive/MyDrive/TSR/data/prepared' if colab else os.path.join('data', 'prepared')
-models_path = '../content/drive/MyDrive/TSR/models' if colab else os.path.join('models')
-images_path = '../content/drive/MyDrive/TSR/images/telebot_images' if colab else os.path.join('images', 'telebot_images')
+data_prepared_path = os.path.join('data', 'prepared')
+models_path = os.path.join('models')
+images_path = os.path.join('images', 'telebot_images')
 if not os.path.exists(images_path): os.makedirs(images_path)
 
 detector_file = 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'
