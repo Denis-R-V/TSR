@@ -2,11 +2,12 @@ import json
 import os
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from PIL.JpegImagePlugin import JpegImageFile
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.transforms import v2
@@ -144,7 +145,7 @@ class Builder:
                 print(f"Для {classifier_name} загружены веса {path}")
 
     def preprocessing_single(self, payload: str | np.ndarray | JpegImageFile):
-        """Препроцессинг для онлайн процесса"""
+        """Препроцессинг для онлайн предсказания"""
         
         if isinstance(payload, str) == True:
             img = Image.open(payload)
@@ -198,12 +199,12 @@ class Builder:
         return pred_classifier
 
     def predict_single(self, model_input: str | np.ndarray | JpegImageFile):
-        """Скоринг для онлайн процесса"""
+        """Предсказание онлайн"""
         '''
         на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
         функция возвращает координаты рамок, ID классов, уверенности детекций и вероятности класса для одного изображения
         при debug_mode=True выводятся детекции с любой уверенностью и 0-й класс (фон)
-        ''' 
+        '''
 
         assert isinstance(model_input, str) or isinstance(model_input, np.ndarray) or isinstance(model_input, JpegImageFile), \
             'На вход модели подается путь к изображению или изображение, открытое PIL или OpenCV (BGR)'
@@ -244,3 +245,124 @@ class Builder:
                     pred_classifier_scores.pop(index)
         
         return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
+    
+    def draw_bboxes_pil(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
+        """Добавление рамок и описаний на изображение, открытое PIL"""
+
+        '''
+        # получаем шрифты
+        if sys.platform == 'win32':
+            fonts_path = 'C:\Windows\Fonts'
+        elif sys.platform == 'darwin':
+            fonts_path = '/System/Library/Fonts/'
+        else:
+            print('По заданному пути отсутствуют шрифты')    
+        font = ImageFont.truetype(os.path.join(fonts_path, 'ARLRDBD.TTF'), size=50)'''
+        font = ImageFont.truetype('ARLRDBD.TTF', size=50)    
+        
+        # ImageDraw  отрисовывает рамки и трешхолды непосредственно на изображении
+        pencil = ImageDraw.Draw(img)
+        for i in range(len(bboxes)):
+            pencil.rectangle(bboxes[i], fill = None, width=8, outline='yellow')
+        for i in range(len(bboxes)):
+            text_x = round(bboxes[i][0])-10
+            text_y = round(bboxes[i][1])-50
+            label = "{0}: {1:1.2f}/{2:1.2f}".format(str(self.class2label_map[labels[i]]), detector_scores[i], classifier_scores[i])
+            pencil.text((text_x, text_y), label, font=font, fill = 'red')  
+        
+        if save_path:
+            img.save(save_path)
+
+        if display_img:
+            fig, a = plt.subplots()
+            fig.set_size_inches(18, 10)
+            a.imshow(img)
+            plt.show()
+
+        return img
+
+    def draw_bboxes_opencv(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
+        """Добавление рамок и описаний на изображение, открытое OpenCV"""
+        # font  FONT_HERSHEY_SIMPLEX FONT_HERSHEY_PLAIN FONT_HERSHEY_DUPLEX FONT_HERSHEY_COMPLEX FONT_HERSHEY_TRIPLEX
+        #       FONT_HERSHEY_COMPLEX_SMALL FONT_HERSHEY_SCRIPT_SIMPLEX FONT_HERSHEY_SCRIPT_COMPLEX
+        font = cv2.FONT_HERSHEY_COMPLEX
+        
+        # fontScale
+        fontScale = 1.5
+        
+        # Colors in BGR
+        rect_color = (0, 255, 255)
+        text_color = (0, 0, 255)
+
+        # Line thickness of px
+        thickness = 4
+
+        for i in range(len(bboxes)):
+            cv2.rectangle(img, (round(bboxes[i][0]), round(bboxes[i][1])), (round(bboxes[i][2]), round(bboxes[i][3])), rect_color, 8)
+        for i in range(len(bboxes)):    
+            text_x = round(bboxes[i][0]) - 10
+            text_y = round(bboxes[i][1]) - 10  
+            mark = "{0}: {1:1.2f}/{2:1.2f}".format(str(self.class2label_map[labels[i]]), detector_scores[i], classifier_scores[i])
+            img = cv2.putText(img, mark, (text_x, text_y), font, 
+                    fontScale, text_color, thickness, cv2.LINE_AA, False)
+
+        if save_path:
+            cv2.imwrite(save_path, img)
+
+        if display_img:
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            fig, a = plt.subplots(1,1)
+            fig.set_size_inches(18,10)
+            a.imshow(img_rgb)
+
+        return img
+
+
+    def predict_single_visualized(self, img: str | np.ndarray | JpegImageFile, display_img: bool = False, save_path: str = None,
+                                  detector_threshold: float = None, classifier_threshold: float = None, debug_mode: float = None):
+        """Предикт с возвратом изображения с рамками и описаниями
+        на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
+        на выходе изображение PIL с нанесенными рамками, ID классов, уверенностями детекций и вероятностями класса для одного изображения  
+        (OpenCV в BGR, если на вход подавальсь изображение, открытое OpenCV в BGR) и список с расшифровкой классов
+        при display_img=False
+        при debug_mode=True выводятся детекции с любой уверенностью и  0-й класс (фон)
+        пороги чувствительности детектора и классификатора меняются только для одного предсказания
+        """
+
+        # Если заданы threshold или debug_mode - меняем параметры модели
+        if detector_threshold is not None:                                  # перенести в предикт
+            detector_threshold_old = self.detector_threshold
+            self.detector_threshold = detector_threshold
+        if classifier_threshold is not None:
+            classifier_threshold_old = self.classifier_threshold
+            self.classifier_threshold = classifier_threshold
+        if debug_mode is not None:
+            debug_mode_old = self.debug_mode
+            self.debug_mode = debug_mode
+
+        # загрузка изображения, если на вход подан путь
+        if isinstance(img, str) == True:
+            img = Image.open(img)
+
+        # получение предсказаний модели
+        bboxes, labels, detector_scores, classifier_scores = self.predict_single(img)
+
+        # Описание знаков
+        signs_in_predict = sorted(list(set([self.class2label_map[label] for label in labels])))
+        description_predict = ["{}: {}".format(sign, self.labels2names_map[sign]) for sign in signs_in_predict]
+        if display_img:
+            print('\n'.join(description_predict))
+
+        # если изображение открыто PIL
+        if isinstance(img, JpegImageFile) == True:
+            img_pred = self.draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+        # если изображение открыто OpenCV
+        else:
+            img_pred = self.draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+
+        # Возврат threshold или debug_mode
+        if detector_threshold is not None: self.detector_threshold = detector_threshold_old
+        if classifier_threshold is not None: self.classifier_threshold = classifier_threshold_old
+        if debug_mode is not None: self.debug_mode = debug_mode_old
+
+        return img_pred, description_predict
