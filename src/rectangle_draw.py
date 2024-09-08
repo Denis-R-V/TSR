@@ -57,6 +57,3 @@ def draw_bboxes_patches(model, img: str | JpegImageFile,
     if debug_mode is not None: model.debug_mode = debug_mode_old
 
     return bboxes, labels, detector_scores, classifier_scores
-
-img_path = os.path.join('..','images','image_for_predict','p20_8.jpg')
-temp = draw_bboxes_patches(model, img_path, detector_threshold=None, classifier_threshold=None, debug_mode=None)
