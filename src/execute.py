@@ -15,18 +15,16 @@ from torchvision.transforms import v2
 class Builder:
     def __init__(self,
                  device: str = 'cpu',
-                 class2label_path: str = os.path.join('..', 'data', 'raw', 'RTSD', 'label_map.json'),     # скопировать в prepared
-                 label2name_path: str = os.path.join('..', 'data', 'prepared', 'labels_names_map.json'),
-                 detector_path: str = os.path.join('..', 'models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
-                 classifier_path: str = os.path.join('..', 'models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_model_29.pth'),
+                 class2label_path: str = os.path.join('data', 'prepared', 'label_map.json'),     # скопировать в prepared
+                 label2name_path: str = os.path.join('data', 'prepared', 'labels_names_map.json'),
+                 detector_path: str = os.path.join('models', 'chkpt_detector_resnet50_v2_augmented_b8_5.pth'),
+                 classifier_path: str = os.path.join('models', 'classifier_resnet152_add_signs_bg100_tvs_randomchoice_perspective_colorjitter_resizedcrop_erasing_adam_001_sh_10_06_model_29.pth'),
                  detector_num_classes: int = 2,
                  classifier_num_classes: int = 156,
                  detector_threshold: float = 0.,
                  classifier_threshold: int = 0.,
                  debug_mode: bool = False):
         """Загрузка ML модели и вспомогательных файлов"""
-
-        print('Добавить файлы со знаками')
         
         self.device = device
         self.detector_threshold = detector_threshold
@@ -257,16 +255,21 @@ class Builder:
             fonts_path = '/System/Library/Fonts/'
         else:
             print('По заданному пути отсутствуют шрифты')    
-        font = ImageFont.truetype(os.path.join(fonts_path, 'ARLRDBD.TTF'), size=50)'''
-        font = ImageFont.truetype('ARLRDBD.TTF', size=50)    
+        font = ImageFont.truetype(os.path.join(fonts_path, 'ARLRDBD.TTF'), size=50)
+        '''
         
+        rectangle_thickness = round(img.width/500)
+        text_size = round(img.height/60)+4#round(img.height/50)
+        font = ImageFont.truetype('ARLRDBD.TTF', size=text_size)    
+
         # ImageDraw  отрисовывает рамки и трешхолды непосредственно на изображении
         pencil = ImageDraw.Draw(img)
         for i in range(len(bboxes)):
-            pencil.rectangle(bboxes[i], fill = None, width=8, outline='yellow')
+            #pencil.rectangle(bboxes[i], fill = None, width=8, outline='yellow')
+            pencil.rectangle(bboxes[i], fill = None, width=rectangle_thickness, outline='yellow')
         for i in range(len(bboxes)):
-            text_x = round(bboxes[i][0])-10
-            text_y = round(bboxes[i][1])-50
+            text_x = round(bboxes[i][0]) - 10
+            text_y = round(bboxes[i][1]) - text_size - rectangle_thickness/2
             label = "{0}: {1:1.2f}/{2:1.2f}".format(str(self.class2label_map[labels[i]]), detector_scores[i], classifier_scores[i])
             pencil.text((text_x, text_y), label, font=font, fill = 'red')  
         
