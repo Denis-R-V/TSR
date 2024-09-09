@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 import cv2
 import matplotlib.pyplot as plt
@@ -247,20 +248,18 @@ class Builder:
     def __draw_bboxes_pil(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
         """Добавление рамок и описаний на изображение, открытое PIL"""
 
-        '''
         # получаем шрифты
         if sys.platform == 'win32':
             fonts_path = 'C:\Windows\Fonts'
         elif sys.platform == 'darwin':
-            fonts_path = '/System/Library/Fonts/'
+            fonts_path = '/System/Library/Fonts/Supplemental'
         else:
             print('По заданному пути отсутствуют шрифты')    
-        font = ImageFont.truetype(os.path.join(fonts_path, 'ARLRDBD.TTF'), size=50)
-        '''
-        
+        #'ARLRDBD.TTF'
+         
         rectangle_thickness = round(img.width/500)
         text_size = round(img.height/60)+4#round(img.height/50)
-        font = ImageFont.truetype('ARLRDBD.TTF', size=text_size)    
+        font = ImageFont.truetype(os.path.join(fonts_path, 'Arial Black.TTF'), size=text_size)    
 
         # ImageDraw  отрисовывает рамки и трешхолды непосредственно на изображении
         pencil = ImageDraw.Draw(img)
