@@ -248,13 +248,11 @@ class Builder:
     def __get_font_path(self, font_name):
         """Поиск пути к шрифту"""
     
-        paths = [os.path.join('..', 'data', 'prepared', font_name),
-                os.path.join('..', 'data', font_name),
-                os.path.join('data', 'prepared', font_name),
-                os.path.join('data', font_name),
-                os.path.join('C:\\Windows\\Fonts', font_name),
-                os.path.join('/System/Library/Fonts/Supplemental', font_name),
-                os.path.join('/System/Library/Fonts', font_name)]
+        paths = [os.path.join('..', 'data', 'fonts', font_name),
+                 os.path.join('data', 'fonts', font_name),
+                 os.path.join('C:\\Windows\\Fonts', font_name),
+                 os.path.join('/System/Library/Fonts/Supplemental', font_name),
+                 os.path.join('/System/Library/Fonts', font_name)]
         
         font_path = None
         for path in paths:
@@ -272,7 +270,7 @@ class Builder:
  
         rectangle_thickness = round(img.width/500)
         text_size = round(img.height/60)+4      #round(img.height/50)
-        font = 'Arial Black.TTF'                #'ARLRDBD.TTF'
+        font = 'Arlrdbd.ttf' # 'Arial Black.ttf' 'Arlrdbd.ttf'
         font = ImageFont.truetype(self.__get_font_path(font), size=text_size)     
 
         # ImageDraw  отрисовывает рамки и трешхолды непосредственно на изображении
