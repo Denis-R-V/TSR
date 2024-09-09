@@ -245,21 +245,35 @@ class Builder:
         
         return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
     
+    def __get_font_path(self, font_name):
+        """Поиск пути к шрифту"""
+    
+        paths = [os.path.join('..', 'data', 'prepared', font_name),
+                os.path.join('..', 'data', font_name),
+                os.path.join('data', 'prepared', font_name),
+                os.path.join('data', font_name),
+                os.path.join('C:\\Windows\\Fonts', font_name),
+                os.path.join('/System/Library/Fonts/Supplemental', font_name),
+                os.path.join('/System/Library/Fonts', font_name)]
+        
+        font_path = None
+        for path in paths:
+            if os.path.exists(path):
+                font_path = path
+                break
+        
+        if font_path is None:
+            print(f'Шрифт {font_name} не найден')
+
+        return font_path
+    
     def __draw_bboxes_pil(self, img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path):
         """Добавление рамок и описаний на изображение, открытое PIL"""
-
-        # получаем шрифты
-        if sys.platform == 'win32':
-            fonts_path = 'C:\Windows\Fonts'
-        elif sys.platform == 'darwin':
-            fonts_path = '/System/Library/Fonts/Supplemental'
-        else:
-            print('По заданному пути отсутствуют шрифты')    
-        #'ARLRDBD.TTF'
-         
+ 
         rectangle_thickness = round(img.width/500)
-        text_size = round(img.height/60)+4#round(img.height/50)
-        font = ImageFont.truetype(os.path.join(fonts_path, 'Arial Black.TTF'), size=text_size)    
+        text_size = round(img.height/60)+4      #round(img.height/50)
+        font = 'Arial Black.TTF'                #'ARLRDBD.TTF'
+        font = ImageFont.truetype(self.__get_font_path(font), size=text_size)     
 
         # ImageDraw  отрисовывает рамки и трешхолды непосредственно на изображении
         pencil = ImageDraw.Draw(img)
