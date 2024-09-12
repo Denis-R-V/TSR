@@ -37,6 +37,10 @@ class Builder:
         self.__load_detector(detector_path, detector_num_classes)
         self.__load_classisier(classifier_path, classifier_num_classes)
 
+        # новые границы bbox для кадрирования на bbox_expand_perc процентов, но не менее, чем на bbox_expand_pixel пикселей
+        self.bbox_expand_perc  = None   # доля 0-1
+        self.bbox_expand_pixel = None     # количество пикселей
+
     def __load_class2label_map(self, path):
         """Загрузка маппинга ID классов на ID знаков"""
  
@@ -185,6 +189,49 @@ class Builder:
 
         return bboxes, pred_detector_labels, pred_detector_scores
 
+    def expand_bbox(self, img, bbox):
+        
+        if img.__class__.__name__ == 'ndarray':
+            img_height, img_width, _ = img.shape
+        else:
+            img_height = img.height
+            img_width = img.width        
+        
+        sign_w = bbox[2] - bbox[0]          # ширина знака
+        sign_h = bbox[3] - bbox[1]          # высота знака
+        
+        # новые границы шире на bbox_expand_perc процентов, но не менее, чем на bbox_expand_pixel пикселей
+        x1 = max(bbox[0] - round(max((sign_w*self.bbox_expand_perc), self.bbox_expand_pixel)), 0)
+        y1 = max(bbox[1] - round(max((sign_h*self.bbox_expand_perc), self.bbox_expand_pixel)), 0)
+        x2 = min(bbox[2] + round(max((sign_w*self.bbox_expand_perc), self.bbox_expand_pixel)), img_width)
+        y2 = min(bbox[3] + round(max((sign_h*self.bbox_expand_perc), self.bbox_expand_pixel)), img_height)
+        new_bbox = [x1, y1, x2, y2]
+
+        return new_bbox
+
+    def crop_sign(self, img, bbox):
+        """Кадрирование знака"""
+
+        if (self.bbox_expand_perc is not None) or (self.bbox_expand_pixel is not None):
+            bbox = self.expand_bbox(img, bbox)
+        
+        if img.__class__.__name__ == 'ndarray':
+            sign = img[round(bbox[1]):round(bbox[3]), round(bbox[0]):round(bbox[2])]
+        else:
+            sign = img.crop(bbox)
+
+        return sign
+
+    def preprocessing_sign(self, sign):
+        """Препроцессинг знака для онлайн предсказания"""
+        #sign = v2.functional.to_tensor(sign)
+        # The function `to_tensor(...)` is deprecated and will be removed in a future release.
+        # Instead, please use `to_image(...)` followed by `to_dtype(..., dtype=torch.float32, scale=True)
+        sign = v2.functional.to_image(sign)
+        sign = v2.functional.to_dtype(sign, dtype=torch.float32, scale=True)
+        sign = v2.functional.resize(sign, [224,224]).to(self.device)
+        return sign 
+
     def predict_class(self, img):
         """Классификация знака"""
 
@@ -214,17 +261,9 @@ class Builder:
         pred_labels = []
         pred_classifier_scores = []
         for i in range(len(bboxes)):
-            if img.__class__.__name__ == 'ndarray':
-                sign = img[round(bboxes[i][1]):round(bboxes[i][3]), round(bboxes[i][0]):round(bboxes[i][2])]
-            else:
-                sign = img.crop(bboxes[i])
-  
-            #sign = v2.functional.to_tensor(sign)
-            # The function `to_tensor(...)` is deprecated and will be removed in a future release.
-            # Instead, please use `to_image(...)` followed by `to_dtype(..., dtype=torch.float32, scale=True)
-            sign = v2.functional.to_image(sign)
-            sign = v2.functional.to_dtype(sign, dtype=torch.float32, scale=True)
-            sign = v2.functional.resize(sign, [224,224]).to(self.device)       
+            
+            sign = self.crop_sign(img, bboxes[i])
+            sign = self.preprocessing_sign(sign)
             pred_classifier = self.predict_class(sign)
             
             pred_labels.append(int(pred_classifier.indices[0][0]))
