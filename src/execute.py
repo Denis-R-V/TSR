@@ -189,7 +189,7 @@ class Builder:
 
         return bboxes, pred_detector_labels, pred_detector_scores
 
-    def expand_bbox(self, img, bbox):
+    def __expand_bbox(self, img, bbox):
         
         if img.__class__.__name__ == 'ndarray':
             img_height, img_width, _ = img.shape
@@ -209,11 +209,11 @@ class Builder:
 
         return new_bbox
 
-    def crop_sign(self, img, bbox):
+    def __crop_sign(self, img, bbox):
         """Кадрирование знака"""
 
         if (self.bbox_expand_perc is not None) or (self.bbox_expand_pixel is not None):
-            bbox = self.expand_bbox(img, bbox)
+            bbox = self.__expand_bbox(img, bbox)
         
         if img.__class__.__name__ == 'ndarray':
             sign = img[round(bbox[1]):round(bbox[3]), round(bbox[0]):round(bbox[2])]
@@ -262,7 +262,7 @@ class Builder:
         pred_classifier_scores = []
         for i in range(len(bboxes)):
             
-            sign = self.crop_sign(img, bboxes[i])
+            sign = self.__crop_sign(img, bboxes[i])
             sign = self.preprocessing_sign(sign)
             pred_classifier = self.predict_class(sign)
             
