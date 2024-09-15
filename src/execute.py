@@ -257,12 +257,13 @@ class Builder:
 
         img = self.preprocessing_single(model_input)
         bboxes, pred_labels, pred_detector_scores = self.predict_signs(img)
-
+        bboxes = [[round(item) for item in bbox] for bbox in bboxes]
+        
         pred_labels = []
         pred_classifier_scores = []
-        for i in range(len(bboxes)):
+        for bbox in bboxes:
             
-            sign = self.__crop_sign(img, bboxes[i])
+            sign = self.__crop_sign(img, bbox)
             sign = self.preprocessing_sign(sign)
             pred_classifier = self.predict_class(sign)
             
