@@ -244,7 +244,8 @@ class Builder:
 
         return pred_classifier
 
-    def predict_single(self, model_input: str | np.ndarray | JpegImageFile):
+    def predict_single(self, model_input: str | np.ndarray | JpegImageFile,
+                       detector_threshold: float = None, classifier_threshold: float = None, debug_mode: float = None):
         """Предсказание онлайн"""
         '''
         на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
@@ -254,6 +255,17 @@ class Builder:
 
         assert isinstance(model_input, str) or isinstance(model_input, np.ndarray) or isinstance(model_input, JpegImageFile), \
             'На вход модели подается путь к изображению или изображение, открытое PIL или OpenCV (BGR)'
+
+        # Если заданы threshold или debug_mode - меняем параметры модели
+        if detector_threshold is not None:
+            detector_threshold_old = self.detector_threshold
+            self.detector_threshold = detector_threshold
+        if classifier_threshold is not None:
+            classifier_threshold_old = self.classifier_threshold
+            self.classifier_threshold = classifier_threshold
+        if debug_mode is not None:
+            debug_mode_old = self.debug_mode
+            self.debug_mode = debug_mode
 
         img = self.preprocessing_single(model_input)
         bboxes, pred_labels, pred_detector_scores = self.predict_signs(img)
@@ -283,6 +295,11 @@ class Builder:
                     pred_detector_scores.pop(index)
                     pred_classifier_scores.pop(index)
         
+        # Возврат threshold или debug_mode
+        if detector_threshold is not None: self.detector_threshold = detector_threshold_old
+        if classifier_threshold is not None: self.classifier_threshold = classifier_threshold_old
+        if debug_mode is not None: self.debug_mode = debug_mode_old
+
         return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
     
     def __get_font_path(self, font_name):
@@ -383,23 +400,12 @@ class Builder:
         пороги чувствительности детектора и классификатора меняются только для одного предсказания
         """
 
-        # Если заданы threshold или debug_mode - меняем параметры модели
-        if detector_threshold is not None:                                  # перенести в предикт
-            detector_threshold_old = self.detector_threshold
-            self.detector_threshold = detector_threshold
-        if classifier_threshold is not None:
-            classifier_threshold_old = self.classifier_threshold
-            self.classifier_threshold = classifier_threshold
-        if debug_mode is not None:
-            debug_mode_old = self.debug_mode
-            self.debug_mode = debug_mode
-
         # загрузка изображения, если на вход подан путь
         if isinstance(img, str) == True:
             img = Image.open(img)
 
         # получение предсказаний модели
-        bboxes, labels, detector_scores, classifier_scores = self.predict_single(img)
+        bboxes, labels, detector_scores, classifier_scores = self.predict_single(img, detector_threshold, classifier_threshold, debug_mode)
 
         # Описание знаков
         signs_in_predict = sorted(list(set([self.class2label_map[label] for label in labels])))
@@ -413,10 +419,5 @@ class Builder:
         # если изображение открыто OpenCV
         else:
             img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
-
-        # Возврат threshold или debug_mode
-        if detector_threshold is not None: self.detector_threshold = detector_threshold_old
-        if classifier_threshold is not None: self.classifier_threshold = classifier_threshold_old
-        if debug_mode is not None: self.debug_mode = debug_mode_old
 
         return img_pred, description_predict
