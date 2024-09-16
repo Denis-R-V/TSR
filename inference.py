@@ -12,7 +12,8 @@ from src.execute import Builder
 
 # Пути к данным и параметры
 device_id = 0
-device = f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu'
+device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
+print(torch.cuda.get_device_name(0) if device.type == 'cuda' else device.type)
 
 data_prepared_path = os.path.join('data', 'prepared')
 models_path = os.path.join('models')
