@@ -24,12 +24,14 @@ class Builder:
                  classifier_num_classes: int = 156,
                  detector_threshold: float = 0.,
                  classifier_threshold: int = 0.,
+                 multiplication_threshold: int = 0.,
                  debug_mode: bool = False):
         """Загрузка ML модели и вспомогательных файлов"""
         
         self.device = device
         self.detector_threshold = detector_threshold
         self.classifier_threshold = classifier_threshold
+        self.multiplication_threshold = multiplication_threshold
         self.debug_mode = debug_mode
 
         self.__load_class2label_map(class2label_path)
@@ -245,7 +247,8 @@ class Builder:
         return pred_classifier
 
     def predict_single(self, model_input: str | np.ndarray | JpegImageFile,
-                       detector_threshold: float = None, classifier_threshold: float = None, debug_mode: float = None):
+                       detector_threshold: float = None, classifier_threshold: float = None,
+                       multiplication_threshold: float = None , debug_mode: float = None):
         """Предсказание онлайн"""
         '''
         на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
@@ -263,6 +266,9 @@ class Builder:
         if classifier_threshold is not None:
             classifier_threshold_old = self.classifier_threshold
             self.classifier_threshold = classifier_threshold
+        if multiplication_threshold is not None:
+            multiplication_threshold_old = self.multiplication_threshold
+            self.multiplication_threshold = multiplication_threshold
         if debug_mode is not None:
             debug_mode_old = self.debug_mode
             self.debug_mode = debug_mode
@@ -282,6 +288,24 @@ class Builder:
             pred_labels.append(int(pred_classifier.indices[0][0]))
             pred_classifier_scores.append(float(pred_classifier.values[0][0]))
 
+        # Произведение уверенностей моделей
+        pred_multiplication_scores = [d*c for d, c in zip(pred_detector_scores, pred_classifier_scores)]
+
+        # Фильтрация предсказаний с произведением уверенностей моделей больше threshold                 # в отдельную функцию
+        if (self.debug_mode == False) and (self.multiplication_threshold > 0.):       
+            try:
+                pred_tr = [pred_multiplication_scores.index(x) for x in pred_multiplication_scores if x > self.multiplication_threshold][-1]
+                bboxes = bboxes[:pred_tr+1]
+                pred_detector_labels = pred_detector_labels[:pred_tr+1] 
+                pred_detector_scores = pred_detector_scores[:pred_tr+1]
+                pred_multiplication_scores = pred_multiplication_scores[:pred_tr+1]
+
+            except:
+                bboxes = []
+                pred_detector_labels = []
+                pred_detector_scores = []
+                pred_multiplication_scores = []
+
         # Если режим отладки не включен убираем детекции, которые классифицированы как фон
         if self.debug_mode == False:
             # индексы 0 класса (фона) в предсказаниях классификатора
@@ -294,13 +318,15 @@ class Builder:
                     pred_labels.pop(index)
                     pred_detector_scores.pop(index)
                     pred_classifier_scores.pop(index)
-        
+                    pred_multiplication_scores.pop(index)
+
         # Возврат threshold или debug_mode
         if detector_threshold is not None: self.detector_threshold = detector_threshold_old
         if classifier_threshold is not None: self.classifier_threshold = classifier_threshold_old
+        if multiplication_threshold is not None: self.multiplication_threshold = multiplication_threshold_old
         if debug_mode is not None: self.debug_mode = debug_mode_old
 
-        return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores
+        return bboxes, pred_labels, pred_detector_scores, pred_classifier_scores, pred_multiplication_scores
     
     def __get_font_path(self, font_name):
         """Поиск пути к шрифту"""
