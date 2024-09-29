@@ -24,7 +24,7 @@ class Builder:
                  classifier_num_classes: int = 156,
                  detector_threshold: float = 0.,
                  classifier_threshold: int = 0.,
-                 multiplication_threshold: int = 0.,
+                 multiplication_threshold: int = 0.85,
                  debug_mode: bool = False):
         """Загрузка ML модели и вспомогательных файлов"""
         
@@ -161,6 +161,17 @@ class Builder:
 
         return img
 
+    def threshold_filter(self, threshold, *lists):
+        """Сортировка и фильтрация списков по thresholds (первый список)"""
+        try:
+            lists_sorted = [lst for lst in map(list, zip(*sorted(zip(*lists), reverse=True)))]
+            pred_tr = [lists_sorted[0].index(x) for x in lists_sorted[0] if x >= threshold][-1]
+            lists_filtred = [lst[:pred_tr+1] for lst in lists_sorted]
+            return lists_filtred
+        except:
+            return [[] for _ in range(len(lists))]
+    
+    
     def predict_signs(self, detector_input):
         """Детекция знаков на изображении"""
         
@@ -178,16 +189,9 @@ class Builder:
         pred_detector_scores = list(detector_pred[0].get('scores').detach().cpu().numpy())
 
         # Фильтрация предсказаний с уверенностью модели больше threshold
-        if (self.debug_mode == False) and (self.detector_threshold > 0.):       
-            try:
-                pred_tr = [pred_detector_scores.index(x) for x in pred_detector_scores if x > self.detector_threshold][-1]
-                bboxes = bboxes[:pred_tr+1]
-                pred_detector_labels = pred_detector_labels[:pred_tr+1] 
-                pred_detector_scores = pred_detector_scores[:pred_tr+1]
-            except:
-                bboxes = []
-                pred_detector_labels = []
-                pred_detector_scores = []
+        if (self.debug_mode == False) and (self.detector_threshold > 0.):
+            pred_detector_scores, bboxes, pred_detector_labels = self.threshold_filter(self.detector_threshold, pred_detector_scores,
+                                                                                       bboxes, pred_detector_labels)
 
         return bboxes, pred_detector_labels, pred_detector_scores
 
@@ -291,22 +295,12 @@ class Builder:
         # Произведение уверенностей моделей
         pred_multiplication_scores = [d*c for d, c in zip(pred_detector_scores, pred_classifier_scores)]
 
-        # Фильтрация предсказаний с произведением уверенностей моделей больше threshold                 # в отдельную функцию
-        if (self.debug_mode == False) and (self.multiplication_threshold > 0.):       
-            try:
-                pred_tr = [pred_multiplication_scores.index(x) for x in pred_multiplication_scores if x > self.multiplication_threshold][-1]
-                bboxes = bboxes[:pred_tr+1]
-                pred_detector_labels = pred_detector_labels[:pred_tr+1] 
-                pred_detector_scores = pred_detector_scores[:pred_tr+1]
-                pred_multiplication_scores = pred_multiplication_scores[:pred_tr+1]
+        # Фильтрация предсказаний с произведением уверенностей моделей больше threshold
+        if (self.debug_mode == False) and (self.multiplication_threshold > 0.):
+            pred_multiplication_scores, pred_detector_scores, pred_classifier_scores, bboxes, pred_labels = self.threshold_filter(self.multiplication_threshold, pred_multiplication_scores,
+                                                                                                                                  pred_detector_scores, pred_classifier_scores, bboxes, pred_labels)
 
-            except:
-                bboxes = []
-                pred_detector_labels = []
-                pred_detector_scores = []
-                pred_multiplication_scores = []
-
-        # Если режим отладки не включен убираем детекции, которые классифицированы как фон
+        # Если режим отладки не включен убираем детекции, которые классифицированы как фон                          # в отдельную функцию
         if self.debug_mode == False:
             # индексы 0 класса (фона) в предсказаниях классификатора
             background_indexes = [index for index, label in enumerate(pred_labels) if label ==0]
@@ -416,7 +410,8 @@ class Builder:
 
 
     def predict_single_visualized(self, img: str | np.ndarray | JpegImageFile, display_img: bool = False, save_path: str = None,
-                                  detector_threshold: float = None, classifier_threshold: float = None, debug_mode: float = None):
+                                  detector_threshold: float = None, classifier_threshold: float = None, multiplication_threshold: float = None,
+                                  debug_mode: float = None):
         """Предикт с возвратом изображения с рамками и описаниями
         на вход подается путь к изображению или изображение, открытое PIL или OpenCV (BGR) и пороги чувствительности детектора и классификатора
         на выходе изображение PIL с нанесенными рамками, ID классов, уверенностями детекций и вероятностями класса для одного изображения  
@@ -431,19 +426,20 @@ class Builder:
             img = Image.open(img)
 
         # получение предсказаний модели
-        bboxes, labels, detector_scores, classifier_scores = self.predict_single(img, detector_threshold, classifier_threshold, debug_mode)
+        bboxes, labels, detector_scores, classifier_scores, multiplication_scores = self.predict_single(img, detector_threshold, classifier_threshold,
+                                                                                                        multiplication_threshold, debug_mode)
 
         # Описание знаков
         signs_in_predict = sorted(list(set([self.class2label_map[label] for label in labels])))
-        description_predict = ["{}: {}".format(sign, self.labels2names_map[sign]) for sign in signs_in_predict]
+        description_predict = ["{}: {}".format(sign, self.labels2names_map[sign]) for sign in signs_in_predict]             
         if display_img:
             print('\n'.join(description_predict))
 
         # если изображение открыто PIL
         if isinstance(img, JpegImageFile) == True:
-            img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+            img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)      # добавить тип визуализации (классификатор, произведение, оба) возможно при дебаг все, при обычном - то что задано
         # если изображение открыто OpenCV
         else:
-            img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
+            img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)       # добавить тип визуализации (классификатор, произведение, оба) возможно при дебаг все, при обычном - то что задано
 
         return img_pred, description_predict
