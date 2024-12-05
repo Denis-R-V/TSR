@@ -40,7 +40,7 @@ bot = telebot.TeleBot(token)
 
 @bot.message_handler(content_types=['text', 'photo'])
 def get_text_message(message):
-    if message.text:                                    # to do если в тексте есть классификатор и детектор - ставим оба, если один - по одному, если не одного - запрос 1 или 2 (оба 3)
+    if message.text:
         if re.search(r'0[\.,\s]\d+', message.text):
             digit_board = re.search('0[\.,\s]\d+', message.text).span()
             threshold = message.text[digit_board[0] : digit_board[1]]

@@ -437,9 +437,9 @@ class Builder:
 
         # если изображение открыто PIL
         if isinstance(img, JpegImageFile) == True:
-            img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)      # добавить тип визуализации (классификатор, произведение, оба) возможно при дебаг все, при обычном - то что задано
+            img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
         # если изображение открыто OpenCV
         else:
-            img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)       # добавить тип визуализации (классификатор, произведение, оба) возможно при дебаг все, при обычном - то что задано
+            img_pred = self.__draw_bboxes_opencv(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
 
         return img_pred, description_predict
