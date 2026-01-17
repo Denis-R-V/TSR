@@ -9,7 +9,6 @@ import torch
 import torch.nn as nn
 import torchvision
 from PIL import Image, ImageDraw, ImageFont
-from PIL.JpegImagePlugin import JpegImageFile
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.transforms import v2
 
@@ -149,7 +148,7 @@ class Builder:
 
                 print(f"Для {classifier_name} загружены веса {path}")
 
-    def preprocessing_single(self, payload: str | np.ndarray | JpegImageFile):
+    def preprocessing_single(self, payload: str | np.ndarray | Image.Image):
         """Препроцессинг для онлайн предсказания"""
         
         if isinstance(payload, str) == True:
@@ -250,7 +249,7 @@ class Builder:
 
         return pred_classifier
 
-    def predict_single(self, model_input: str | np.ndarray | JpegImageFile,
+    def predict_single(self, model_input: str | np.ndarray | Image.Image,
                        detector_threshold: float = None, classifier_threshold: float = None,
                        multiplication_threshold: float = None , debug_mode: float = None):
         """Предсказание онлайн"""
@@ -260,7 +259,7 @@ class Builder:
         при debug_mode=True выводятся детекции с любой уверенностью и 0-й класс (фон)
         '''
 
-        assert isinstance(model_input, str) or isinstance(model_input, np.ndarray) or isinstance(model_input, JpegImageFile), \
+        assert isinstance(model_input, str) or isinstance(model_input, np.ndarray) or isinstance(model_input, Image.Image), \
             'На вход модели подается путь к изображению или изображение, открытое PIL или OpenCV (BGR)'
 
         # Если заданы threshold или debug_mode - меняем параметры модели
@@ -409,7 +408,7 @@ class Builder:
         return img
 
 
-    def predict_single_visualized(self, img: str | np.ndarray | JpegImageFile, display_img: bool = False, save_path: str = None,
+    def predict_single_visualized(self, img: str | np.ndarray | Image.Image, display_img: bool = False, save_path: str = None,
                                   detector_threshold: float = None, classifier_threshold: float = None, multiplication_threshold: float = None,
                                   debug_mode: float = None):
         """Предикт с возвратом изображения с рамками и описаниями
@@ -436,7 +435,7 @@ class Builder:
             print('\n'.join(description_predict))
 
         # если изображение открыто PIL
-        if isinstance(img, JpegImageFile) == True:
+        if isinstance(img, Image.Image) == True:
             img_pred = self.__draw_bboxes_pil(img, bboxes, labels, detector_scores, classifier_scores, display_img, save_path)
         # если изображение открыто OpenCV
         else:

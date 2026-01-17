@@ -1,3 +1,5 @@
-config.py
+.env
 /data/raw
 /models
+
+__pycache__/
